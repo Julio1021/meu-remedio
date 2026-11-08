@@ -370,7 +370,7 @@ class _SkyHeader extends StatelessWidget {
                       height: 264,
                       child: Stack(alignment: Alignment.center, children: [
                         Positioned.fill(
-                          child: CustomPaint(painter: _DialPainter(doses: doses, now: now, t: t, accent: sky.accent, base: sky.colors[1])),
+                          child: CustomPaint(painter: _DialPainter(doses: doses, now: now, t: t, accent: sky.accent, base: sky.colors[1], fontFamily: DefaultTextStyle.of(context).style.fontFamily)),
                         ),
                         SizedBox(
                           width: 150,
@@ -1029,7 +1029,8 @@ class _DialPainter extends CustomPainter {
   final double t;
   final Color accent;
   final Color base;
-  _DialPainter({required this.doses, required this.now, required this.t, required this.accent, required this.base});
+  final String? fontFamily;
+  _DialPainter({this.fontFamily, required this.doses, required this.now, required this.t, required this.accent, required this.base});
 
   static double _frac(DateTime d) => (d.hour * 60 + d.minute) / 1440.0;
   static double _angle(double f) => -math.pi / 2 + 2 * math.pi * f;
@@ -1087,7 +1088,7 @@ class _DialPainter extends CustomPainter {
         final tp = TextPainter(
           text: TextSpan(
             text: '${h}h',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w700),
+            style: TextStyle(fontFamily: fontFamily, color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w700),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
