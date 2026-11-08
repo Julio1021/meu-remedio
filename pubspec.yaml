@@ -33,3 +33,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# O pacote "image" (usado pelo "pdf") exige uma versão mais nova do "archive".
+dependency_overrides:
+  archive: ^4.6.0
