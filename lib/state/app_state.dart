@@ -297,12 +297,29 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<int> addMedication(Medication m, Schedule? s) async {
     final id = await db.insertMedication(m, s);
     await refresh(reschedule: true);
+    await _notifyJustDue(id);
     return id;
   }
 
   Future<void> updateMedication(Medication m, Schedule? s) async {
     await db.updateMedication(m, s);
     await refresh(reschedule: true);
+    await _notifyJustDue(m.id!);
+  }
+
+  /// Se um horário do remédio recém-salvo já chegou (até 15 min atrás) e
+  /// ainda não tem registro, avisa na hora em vez de esperar a repetição.
+  Future<void> _notifyJustDue(int medId) async {
+    if (testMode) return;
+    final now = DateTime.now();
+    for (final d in today.where((d) => d.med.id == medId && d.record == null)) {
+      final age = now.difference(d.scheduledAt);
+      if (!age.isNegative && age.inMinutes <= 15) {
+        try {
+          await notifications.showDueNow(d.med, d.scheduledAt, settings);
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> setMedStatus(int id, MedStatus st) async {

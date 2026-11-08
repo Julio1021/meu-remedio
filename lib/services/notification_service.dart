@@ -335,6 +335,14 @@ class NotificationService {
     }
   }
 
+  /// Mostra imediatamente o lembrete de uma dose cujo horário acabou de
+  /// passar (ex.: remédio cadastrado para o minuto atual).
+  Future<void> showDueNow(Medication med, DateTime scheduledAt, AppSettings s) async {
+    final (title, body) = _texts(med, scheduledAt, s);
+    await plugin.show(doseId(med.id!, scheduledAt, 0), title, body, _doseDetails(med, s, body),
+        payload: DosePayload(med.id!, scheduledAt).encode());
+  }
+
   /// Agenda um lembrete de teste para daqui a [minutes] minuto(s).
   Future<DateTime> scheduleTest({int minutes = 1}) async {
     final at = DateTime.now().add(Duration(minutes: minutes));
