@@ -1,0 +1,65 @@
+name: Compilar app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Versão do Flutter
+        run: flutter --version
+
+      - name: Gerar pastas nativas e configurar
+        run: |
+          flutter create --org br.com.meuremedio --project-name meu_remedio --platforms=android .
+          python3 tool/setup_platforms.py
+
+      - name: Dependências
+        run: flutter pub get
+
+      - name: Análise do código
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Testes
+        run: flutter test
+
+      - name: Número da versão
+        id: ver
+        run: echo "n=$(( 100 + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
+
+      - name: APK
+        run: flutter build apk --release --build-number=${{ steps.ver.outputs.n }}
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: meu-remedio-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Publicar a versão para baixar no celular
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk meu-remedio.apk
+          gh release delete ultima -y --cleanup-tag 2>/dev/null || true
+          gh release create ultima meu-remedio.apk --title "Última versão (build ${{ steps.ver.outputs.n }})" \
+            --notes "Baixe o meu-remedio.apk no celular e toque para instalar. Gerado a partir do commit ${GITHUB_SHA::7}." --latest
