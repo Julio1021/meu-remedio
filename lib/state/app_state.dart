@@ -54,8 +54,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
     try {
       await notifications.init();
-    } catch (e) {
-      debugPrint('Falha ao iniciar notificações: $e');
+    } catch (e, st) {
+      notifications.lastError = 'Falha ao iniciar as notificações: $e';
+      debugPrint('Falha ao iniciar notificações: $e\n$st');
     }
     _changesSub = notifications.changes.stream.listen((_) => refresh(reschedule: false));
     _tapSub = notifications.taps.stream.listen(_handleTap);
@@ -177,8 +178,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         await notifications.rescheduleAll();
         permissions = await notifications.permissionState();
         notifyListeners();
-      } catch (e) {
-        debugPrint('Falha ao reagendar: $e');
+      } catch (e, st) {
+        notifications.lastError = 'Falha ao programar lembretes: $e';
+        debugPrint('Falha ao reagendar: $e\n$st');
       }
     }
   }
