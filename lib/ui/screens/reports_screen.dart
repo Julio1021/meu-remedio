@@ -126,13 +126,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.4,
+            StatGrid(
               children: [
                 StatCard(label: 'Programadas', value: '${st.scheduled}', color: AppColors.info, icon: Icons.event_note_rounded),
                 StatCard(label: 'Confirmadas', value: '${st.taken}', color: AppColors.success, icon: Icons.check_circle_rounded),

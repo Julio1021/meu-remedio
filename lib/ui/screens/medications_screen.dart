@@ -54,7 +54,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
         return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
     return Scaffold(
-      appBar: AppBar(title: const Text('Medicamentos')),
+      appBar: AppBar(title: const Text('Meus remédios')),
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),

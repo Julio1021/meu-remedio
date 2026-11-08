@@ -316,7 +316,9 @@ class _NextDoseCard extends StatelessWidget {
     final diff = target.difference(now);
     final late = d.status == DoseStatus.late;
     final accent = late ? AppColors.pending : Color(d.med.color);
-    final when = late ? 'Atrasado ${fmtDuration(diff)}' : (snoozed ? 'Adiado • ${fmtDuration(diff)}' : fmtDuration(diff));
+    final when = late
+        ? 'Atrasado • ${fmtDuration(diff).replaceFirst('há ', '')}'
+        : (snoozed ? 'Adiado • ${fmtDuration(diff)}' : 'Faltam ${fmtDuration(diff).replaceFirst('em ', '')}');
     return Card(
       clipBehavior: Clip.antiAlias,
       child: IntrinsicHeight(
@@ -326,20 +328,29 @@ class _NextDoseCard extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  MedAvatar(d.med, size: 52),
-                  const SizedBox(width: 14),
+                Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 10, runSpacing: 4, children: [
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.schedule_rounded, color: accent, size: 22),
+                    const SizedBox(width: 6),
+                    Text(fmtTime(d.scheduledAt), style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: accent, height: 1.1)),
+                  ]),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
+                    child: Text(when, style: TextStyle(fontSize: 12.5, color: accent, fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                Row(children: [
+                  MedAvatar(d.med, size: 50),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(d.med.displayName, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                      Text(d.med.displayName, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, height: 1.2)),
                       const SizedBox(height: 2),
                       Text('${d.med.form} • ${d.med.doseDescription}', style: TextStyle(color: cs.onSurfaceVariant)),
                     ]),
                   ),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(fmtTime(d.scheduledAt), style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: accent)),
-                    Text(when, style: TextStyle(fontSize: 12, color: late ? AppColors.pending : cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
-                  ]),
                 ]),
                 if ((d.med.instructions ?? '').trim().isNotEmpty) ...[
                   const SizedBox(height: 10),

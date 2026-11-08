@@ -110,7 +110,7 @@ ThemeData buildTheme(Brightness brightness) {
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        textStyle: text.labelLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -118,14 +118,14 @@ ThemeData buildTheme(Brightness brightness) {
         minimumSize: const Size(64, 52),
         side: BorderSide(color: scheme.primary.withValues(alpha: 0.5), width: 1.4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: text.labelLarge?.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: light ? AppColors.accent : scheme.primary,
       foregroundColor: light ? Colors.white : scheme.onPrimary,
       elevation: 3,
-      extendedTextStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+      extendedTextStyle: text.labelLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 15),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -140,7 +140,7 @@ ThemeData buildTheme(Brightness brightness) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       selectedColor: scheme.primary.withValues(alpha: light ? 0.16 : 0.32),
       checkmarkColor: scheme.primary,
-      labelStyle: WidgetStateTextStyle.resolveWith((st) => TextStyle(
+      labelStyle: WidgetStateTextStyle.resolveWith((st) => (text.labelLarge ?? const TextStyle()).copyWith(
             fontWeight: st.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
             color: st.contains(WidgetState.selected) ? scheme.primary : scheme.onSurface,
           )),
@@ -152,7 +152,7 @@ ThemeData buildTheme(Brightness brightness) {
       style: ButtonStyle(
         backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.primary : scheme.surface),
         foregroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.onPrimary : scheme.onSurface),
-        textStyle: const WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w700)),
+        textStyle: WidgetStatePropertyAll(text.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
@@ -164,7 +164,7 @@ ThemeData buildTheme(Brightness brightness) {
       indicatorColor: scheme.primary,
       iconTheme: WidgetStateProperty.resolveWith(
           (s) => IconThemeData(color: s.contains(WidgetState.selected) ? scheme.onPrimary : scheme.onSurfaceVariant)),
-      labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(
+      labelTextStyle: WidgetStateProperty.resolveWith((s) => (text.labelMedium ?? const TextStyle()).copyWith(
             fontSize: 12,
             fontWeight: s.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
             color: s.contains(WidgetState.selected) ? scheme.primary : scheme.onSurfaceVariant,
@@ -174,14 +174,15 @@ ThemeData buildTheme(Brightness brightness) {
       labelColor: scheme.primary,
       unselectedLabelColor: scheme.onSurfaceVariant,
       indicatorColor: scheme.primary,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w800),
+      labelStyle: text.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+      unselectedLabelStyle: text.titleSmall?.copyWith(fontWeight: FontWeight.w600),
     ),
     listTileTheme: const ListTileThemeData(contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 2)),
     dividerTheme: DividerThemeData(color: scheme.outlineVariant, space: 1),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: light ? AppColors.primaryDark : const Color(0xFF2B3B3A),
-      contentTextStyle: const TextStyle(color: Colors.white),
+      contentTextStyle: text.bodyMedium?.copyWith(color: Colors.white),
       actionTextColor: const Color(0xFF7FE6DC),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),

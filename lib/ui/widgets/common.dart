@@ -209,7 +209,7 @@ class DoseTile extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(name,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
@@ -355,4 +355,25 @@ class LabeledValue extends StatelessWidget {
           Expanded(flex: 3, child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
         ]),
       );
+}
+
+/// Grade de indicadores em duas colunas que se ajusta à altura do conteúdo
+/// (não corta texto com fonte grande).
+class StatGrid extends StatelessWidget {
+  final List<Widget> children;
+  const StatGrid({super.key, required this.children});
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        for (var i = 0; i < children.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: 12),
+          IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(child: children[i]),
+              const SizedBox(width: 12),
+              Expanded(child: i + 1 < children.length ? children[i + 1] : const SizedBox()),
+            ]),
+          ),
+        ],
+      ]);
 }
