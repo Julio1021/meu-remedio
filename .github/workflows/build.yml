@@ -42,12 +42,32 @@ jobs:
       - name: Testes
         run: flutter test
 
+      - name: Prints das telas
+        run: |
+          flutter test --update-goldens --dart-define=PRINTS=true --dart-define=FLUTTER_ROOT="$FLUTTER_ROOT" test/prints_test.dart || echo "prints com falha"
+          ls -la test/prints || true
+
+      - name: Guardar prints na branch "saida"
+        run: |
+          mkdir -p /tmp/saida && cp test/prints/*.png /tmp/saida/ 2>/dev/null || true
+          cd /tmp/saida
+          git init -q -b saida
+          git -c user.name="github-actions" -c user.email="actions@github.com" add -A
+          git -c user.name="github-actions" -c user.email="actions@github.com" commit -qm "Prints do build ${{ github.run_number }}" --allow-empty
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" saida
+
       - name: Número da versão
         id: ver
         run: echo "n=$(( 100 + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
 
       - name: APK
         run: flutter build apk --release --build-number=${{ steps.ver.outputs.n }}
+
+      - name: Conferir recursos das notificações no APK
+        run: |
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)
+          "$AAPT" dump resources build/app/outputs/flutter-apk/app-release.apk | grep -E "drawable/ic_stat_pill" || echo "ATENCAO: ic_stat_pill nao encontrado"
+          "$AAPT" dump xmltree --file AndroidManifest.xml build/app/outputs/flutter-apk/app-release.apk | grep -E "permission|receiver|dexterous" | head -40
 
       - name: Guardar APK
         uses: actions/upload-artifact@v4

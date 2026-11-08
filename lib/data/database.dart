@@ -27,7 +27,7 @@ class AppDatabase {
   }
 
   /// Apenas para testes (sqflite_common_ffi / banco em memória).
-  static AppDatabase forTesting(Database db) => AppDatabase._(db);
+  static AppDatabase forTesting(Database db) => _instance = AppDatabase._(db);
   static Future<void> createSchema(Database db) => _create(db);
 
   static Future<void> _create(Database db) async {

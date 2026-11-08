@@ -29,6 +29,11 @@ def android():
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copy(PLAT / "android" / "res" / "drawable" / "ic_stat_pill.xml", dst / "ic_stat_pill.xml")
     done("ícone da notificação (ic_stat_pill)")
+    raw = main / "res" / "raw"
+    raw.mkdir(parents=True, exist_ok=True)
+    shutil.copy(PLAT / "android" / "res" / "raw" / "keep.xml", raw / "keep.xml")
+    shutil.copy(PLAT / "android" / "proguard-rules.pro", app / "proguard-rules.pro")
+    done("keep.xml e proguard-rules.pro (recursos e classes das notificações no modo release)")
 
     kts = app / "build.gradle.kts"
     groovy = app / "build.gradle"

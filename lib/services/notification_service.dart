@@ -85,6 +85,13 @@ class NotificationService {
   bool _ready = false;
   String _tzName = 'America/Sao_Paulo';
 
+  /// Último problema encontrado (exibido na Central de notificações).
+  String? lastError;
+
+  /// Quantidade de lembretes agendados na última reprogramação.
+  int lastScheduledCount = 0;
+  DateTime? lastRescheduleAt;
+
   /// Disparado quando uma ação da notificação alterou dados.
   final changes = StreamController<void>.broadcast();
 
@@ -124,15 +131,18 @@ class NotificationService {
         ]),
       ],
     );
-    final settings = InitializationSettings(
-      android: const AndroidInitializationSettings('ic_stat_pill'),
-      iOS: darwin,
-    );
-    await plugin.initialize(
-      settings,
-      onDidReceiveNotificationResponse: background ? null : handleResponse,
-      onDidReceiveBackgroundNotificationResponse: background ? null : notificationTapBackground,
-    );
+    Future<void> doInit(String icon) => plugin.initialize(
+          InitializationSettings(android: AndroidInitializationSettings(icon), iOS: darwin),
+          onDidReceiveNotificationResponse: background ? null : handleResponse,
+          onDidReceiveBackgroundNotificationResponse: background ? null : notificationTapBackground,
+        );
+    try {
+      await doInit('ic_stat_pill');
+    } catch (e) {
+      // Se o ícone próprio não estiver disponível, usa o ícone do app.
+      lastError = 'Ícone de notificação indisponível ($e). Usando o ícone do app.';
+      await doInit('@mipmap/ic_launcher');
+    }
     final a = _android;
     if (a != null) {
       for (final ch in [_chDefault, _chNoVib, _chSilent, _chAlerts, _chSummary]) {
@@ -292,26 +302,63 @@ class NotificationService {
     return (title, lines.join('\n'));
   }
 
-  AndroidScheduleMode _mode = AndroidScheduleMode.exactAllowWhileIdle;
+  bool _exact = true;
 
-  Future<void> _zoned(int id, DateTime at, String title, String body, NotificationDetails details,
-      {String? payload, DateTimeComponents? match}) async {
+  /// Agenda uma notificação. Lembretes de dose usam o modo "despertador"
+  /// (setAlarmClock), o mais confiável do Android mesmo com economia de
+  /// bateria; os demais avisos usam alarme exato comum.
+  Future<bool> _zoned(int id, DateTime at, String title, String body, NotificationDetails details,
+      {String? payload, DateTimeComponents? match, bool alarm = false}) async {
     final when = tz.TZDateTime.from(at, tz.local);
+    final mode = !_exact
+        ? AndroidScheduleMode.inexactAllowWhileIdle
+        : (alarm ? AndroidScheduleMode.alarmClock : AndroidScheduleMode.exactAllowWhileIdle);
     try {
       await plugin.zonedSchedule(id, title, body, when, details,
-          androidScheduleMode: _mode, payload: payload, matchDateTimeComponents: match);
-    } on PlatformException {
-      // Sem permissão de alarme exato: usa o modo inexato.
-      _mode = AndroidScheduleMode.inexactAllowWhileIdle;
-      await plugin.zonedSchedule(id, title, body, when, details,
-          androidScheduleMode: _mode, payload: payload, matchDateTimeComponents: match);
+          androidScheduleMode: mode, payload: payload, matchDateTimeComponents: match);
+      return true;
+    } on PlatformException catch (e) {
+      // Sem permissão de alarme exato: tenta o modo inexato.
+      lastError = 'Alarme exato recusado pelo sistema (${e.code}). Os avisos podem atrasar.';
+      _exact = false;
+      try {
+        await plugin.zonedSchedule(id, title, body, when, details,
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, payload: payload, matchDateTimeComponents: match);
+        return true;
+      } catch (e2) {
+        lastError = 'Falha ao agendar lembrete: $e2';
+        return false;
+      }
+    } catch (e) {
+      lastError = 'Falha ao agendar lembrete: $e';
+      return false;
     }
+  }
+
+  /// Agenda um lembrete de teste para daqui a [minutes] minuto(s).
+  Future<DateTime> scheduleTest({int minutes = 1}) async {
+    final at = DateTime.now().add(Duration(minutes: minutes));
+    final ch = _chDefault;
+    await _zoned(
+      1399999998,
+      at,
+      'Teste de lembrete agendado',
+      'Se você está vendo esta mensagem, os lembretes agendados estão funcionando.',
+      NotificationDetails(
+        android: AndroidNotificationDetails(ch.id, ch.name,
+            channelDescription: ch.description, importance: Importance.max, priority: Priority.high,
+            category: AndroidNotificationCategory.reminder),
+        iOS: const DarwinNotificationDetails(),
+      ),
+      alarm: true,
+    );
+    return at;
   }
 
   Future<void> scheduleSnooze(Medication med, DateTime scheduledAt, DateTime until, AppSettings s) async {
     final (title, body) = _texts(med, scheduledAt, s, kind: 'snooze');
     await _zoned(doseId(med.id!, scheduledAt, 4), until, title, body, _doseDetails(med, s, body),
-        payload: DosePayload(med.id!, scheduledAt).encode());
+        payload: DosePayload(med.id!, scheduledAt).encode(), alarm: true);
   }
 
   Future<void> showStockAlert(StockAlert a, AppSettings s) async {
@@ -364,8 +411,7 @@ class NotificationService {
     final db = await AppDatabase.open();
     final s = await db.loadSettings();
     if (Platform.isAndroid) {
-      final exact = await _android?.canScheduleExactNotifications() ?? true;
-      _mode = exact ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle;
+      _exact = await _android?.canScheduleExactNotifications() ?? true;
     }
     final meds = (await db.allMedications()).where((m) => m.status == MedStatus.active).toList();
     final schedules = await db.allSchedules();
@@ -417,11 +463,19 @@ class NotificationService {
     }
     planned.sort((a, b) => a.at.compareTo(b.at));
 
-    await plugin.cancelAll();
-    for (final p in planned.take(cap)) {
-      await _zoned(p.id, p.at, p.title, p.body, _doseDetails(p.med, s, p.body, actions: p.withActions),
-          payload: p.payload.encode());
+    // Preserva o teste agendado, se houver.
+    final pendingNow = await plugin.pendingNotificationRequests();
+    for (final r in pendingNow) {
+      if (r.id != 1399999998) await plugin.cancel(r.id);
     }
+    var ok = 0;
+    for (final p in planned.take(cap)) {
+      final done = await _zoned(p.id, p.at, p.title, p.body, _doseDetails(p.med, s, p.body, actions: p.withActions),
+          payload: p.payload.encode(), alarm: true);
+      if (done) ok++;
+    }
+    lastScheduledCount = ok;
+    lastRescheduleAt = DateTime.now();
 
     // Avisos de vencimento e de término de tratamento (09:00 local).
     for (final med in meds) {

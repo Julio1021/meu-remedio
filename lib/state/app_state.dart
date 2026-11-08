@@ -14,6 +14,10 @@ import '../services/notification_service.dart';
 /// Estado global do app. Mantém o perfil ativo, seus medicamentos e as doses
 /// de hoje; todas as ações gravam no SQLite e reagendam as notificações.
 class AppState extends ChangeNotifier with WidgetsBindingObserver {
+  AppState({this.testMode = false});
+
+  /// Em testes (prints automáticos) não usa notificações nem temporizadores.
+  final bool testMode;
   late AppDatabase db;
   final notifications = NotificationService.instance;
 
@@ -41,6 +45,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> init() async {
     db = await AppDatabase.open();
     settings = await db.loadSettings();
+    if (testMode) {
+      await _loadProfiles();
+      await refresh(reschedule: false);
+      ready = true;
+      notifyListeners();
+      return;
+    }
     try {
       await notifications.init();
     } catch (e) {
@@ -161,7 +172,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       today = [];
     }
     notifyListeners();
-    if (reschedule) {
+    if (reschedule && !testMode) {
       try {
         await notifications.rescheduleAll();
         permissions = await notifications.permissionState();

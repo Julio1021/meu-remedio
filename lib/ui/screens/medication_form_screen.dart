@@ -268,7 +268,7 @@ class _MedicationFormScreenState extends State<MedicationFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const titles = ['Medicamento', 'Horários', 'Estoque', 'Detalhes'];
+    const titles = ['Remédio', 'Horários', 'Estoque', 'Detalhes'];
     final cs = Theme.of(context).colorScheme;
     return PopScope(
       canPop: _step == 0,
@@ -302,12 +302,16 @@ class _MedicationFormScreenState extends State<MedicationFormScreen> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text(titles[i],
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(titles[i],
+                            maxLines: 1,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: i == _step ? FontWeight.w700 : FontWeight.w500,
                               color: i == _step ? cs.primary : cs.onSurfaceVariant,
                             )),
+                        ),
                       ]),
                     ),
                   ),

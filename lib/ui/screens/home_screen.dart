@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/formatters.dart';
@@ -12,6 +13,7 @@ import 'notification_center_screen.dart';
 import 'prn_screen.dart';
 import 'profiles_screen.dart';
 import 'settings_screen.dart';
+import 'stock_detail_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -19,164 +21,286 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final cs = Theme.of(context).colorScheme;
-    final now = DateTime.now();
     final doses = app.today;
     final taken = doses.where((d) => d.status == DoseStatus.taken).length;
     final late = doses.where((d) => d.status == DoseStatus.late || d.status == DoseStatus.missed).length;
     final remaining = doses.where((d) => d.isOpen && d.status != DoseStatus.missed && d.status != DoseStatus.late).length;
     final next = app.nextDose;
-    final profile = app.activeProfile!;
     final permOk = app.permissions?.notificationsEnabled ?? true;
     final hasPrn = app.meds.any((m) => m.isPrn && m.status == MedStatus.active);
     final lowStock = app.meds.where((m) => m.stockEnabled && m.status != MedStatus.ended && m.stockQty <= m.stockMin).toList();
 
-    String headline;
-    if (doses.isEmpty) {
-      headline = 'Nenhuma dose programada para hoje.';
-    } else if (late > 0) {
-      headline = late == 1 ? 'Há 1 dose aguardando registro.' : 'Há $late doses aguardando registro.';
-    } else if (remaining == 0) {
-      headline = 'Tudo registrado por hoje!';
-    } else {
-      headline = 'Seu dia está em dia!';
-    }
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+      body: RefreshIndicator(
+        onRefresh: () => app.refresh(),
+        child: ListView(padding: EdgeInsets.zero, children: [
+          _Hero(total: doses.length, taken: taken, remaining: remaining, late: late, permOk: permOk),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (!permOk) ...[
+                const SizedBox(height: 14),
+                _Alert(
+                  color: AppColors.danger,
+                  icon: Icons.notifications_off_rounded,
+                  title: 'Notificações desativadas',
+                  text: 'Os lembretes não vão aparecer. Toque para corrigir.',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationCenterScreen())),
+                ),
+              ],
+              if (next != null) ...[
+                const SectionTitle('Próximo medicamento'),
+                _NextDoseCard(next),
+              ],
+              if (lowStock.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _Alert(
+                  color: AppColors.pending,
+                  icon: Icons.inventory_2_rounded,
+                  title: lowStock.length == 1 ? 'Estoque baixo: ${lowStock.first.displayName}' : 'Estoque baixo em ${lowStock.length} remédios',
+                  text: 'Toque para ver o controle de estoque.',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockScreen())),
+                ),
+              ],
+              if (hasPrn) ...[
+                const SizedBox(height: 12),
+                _Alert(
+                  color: AppColors.info,
+                  icon: Icons.back_hand_rounded,
+                  title: 'Uso eventual',
+                  text: 'Registrar um remédio usado quando necessário.',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrnScreen())),
+                ),
+              ],
+              SectionTitle('Agenda de hoje', trailing: doses.isEmpty ? null : Text('${doses.length} dose(s)')),
+              if (app.meds.isEmpty)
+                EmptyState(
+                  icon: Icons.medication_rounded,
+                  title: 'Vamos começar?',
+                  message: 'Cadastre seu primeiro remédio e configure os horários dos lembretes.',
+                  action: FilledButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MedicationFormScreen())),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Cadastrar remédio'),
+                  ),
+                )
+              else if (doses.isEmpty)
+                const EmptyState(
+                  icon: Icons.event_available_rounded,
+                  title: 'Dia livre',
+                  message: 'Não há doses programadas para hoje. Veja os próximos dias na Agenda.',
+                )
+              else
+                for (final d in doses) Padding(padding: const EdgeInsets.only(bottom: 10), child: DoseTile(d)),
+            ]),
+          ),
+        ]),
+      ),
+    ),
+    );
+  }
+}
 
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () => app.refresh(),
-          child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 100), children: [
-            // Cabeçalho
+/// Cabeçalho colorido com saudação e resumo do dia.
+class _Hero extends StatelessWidget {
+  final int total, taken, remaining, late;
+  final bool permOk;
+  const _Hero({required this.total, required this.taken, required this.remaining, required this.late, required this.permOk});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.read<AppState>();
+    final profile = app.activeProfile!;
+    final now = DateTime.now();
+    final pct = total == 0 ? 0.0 : taken / total;
+    final String headline;
+    if (total == 0) {
+      headline = 'Nenhuma dose hoje';
+    } else if (late > 0) {
+      headline = late == 1 ? '1 dose aguardando' : '$late doses aguardando';
+    } else if (remaining == 0) {
+      headline = 'Tudo registrado!';
+    } else {
+      headline = 'Seu dia está em dia';
+    }
+    const white = Colors.white;
+    final soft = Colors.white.withValues(alpha: 0.82);
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: AppColors.heroGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               InkWell(
                 borderRadius: BorderRadius.circular(30),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilesScreen())),
                 child: CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Color(profile.color).withValues(alpha: 0.18),
+                  radius: 22,
+                  backgroundColor: Colors.white.withValues(alpha: 0.2),
                   child: Text(profile.name.characters.first.toUpperCase(),
-                      style: TextStyle(color: Color(profile.color), fontWeight: FontWeight.w800, fontSize: 20)),
+                      style: const TextStyle(color: white, fontWeight: FontWeight.w800, fontSize: 19)),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${greeting(now)}, ${profile.name.split(' ').first}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                  Text(fmtLongDate(now), style: TextStyle(color: cs.onSurfaceVariant)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: white, fontSize: 20, fontWeight: FontWeight.w800)),
+                  Text(fmtLongDate(now), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: soft)),
                 ]),
               ),
               IconButton(
                 tooltip: 'Central de notificações',
+                color: white,
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationCenterScreen())),
-                icon: Badge(isLabelVisible: !permOk || late > 0, child: const Icon(Icons.notifications_none_rounded)),
+                icon: Badge(
+                  isLabelVisible: !permOk || late > 0,
+                  backgroundColor: AppColors.pending,
+                  child: const Icon(Icons.notifications_none_rounded),
+                ),
               ),
               IconButton(
                 tooltip: 'Configurações',
+                color: white,
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 icon: const Icon(Icons.settings_outlined),
               ),
             ]),
-            if (!permOk) ...[
-              const SizedBox(height: 16),
-              Card(
-                color: AppColors.danger.withValues(alpha: 0.08),
-                child: ListTile(
-                  leading: const Icon(Icons.notifications_off_rounded, color: AppColors.danger),
-                  title: const Text('Notificações desativadas'),
-                  subtitle: const Text('Os lembretes não aparecerão. Toque para corrigir.'),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationCenterScreen())),
-                ),
-              ),
-            ],
             const SizedBox(height: 20),
-            // Resumo diário
-            Text(headline, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.55,
-              children: [
-                StatCard(label: 'Programadas hoje', value: '${doses.length}', color: AppColors.info, icon: Icons.event_note_rounded),
-                StatCard(label: 'Tomadas', value: '$taken', color: AppColors.success, icon: Icons.check_circle_rounded),
-                StatCard(label: 'Restantes', value: '$remaining', color: AppColors.pending, icon: Icons.schedule_rounded),
-                StatCard(label: 'Atrasadas / sem registro', value: '$late', color: AppColors.danger, icon: Icons.error_outline_rounded),
-              ],
-            ),
-            if (doses.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Semantics(
-                label: '$taken de ${doses.length} doses tomadas',
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: doses.isEmpty ? 0 : taken / doses.length,
-                    minHeight: 8,
-                    backgroundColor: cs.outlineVariant.withValues(alpha: 0.4),
-                    color: AppColors.success,
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Row(children: [
+                Semantics(
+                  label: '$taken de $total doses tomadas',
+                  child: SizedBox(
+                    width: 84,
+                    height: 84,
+                    child: Stack(fit: StackFit.expand, children: [
+                      CircularProgressIndicator(
+                        value: pct,
+                        strokeWidth: 9,
+                        strokeCap: StrokeCap.round,
+                        backgroundColor: Colors.white.withValues(alpha: 0.18),
+                        color: const Color(0xFF7FE6A8),
+                      ),
+                      Center(
+                        child: FittedBox(
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Text('$taken/$total',
+                                style: const TextStyle(color: white, fontSize: 20, fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ),
+                    ]),
                   ),
                 ),
-              ),
-            ],
-            // Próximo medicamento
-            if (next != null) ...[
-              const SectionTitle('Próximo medicamento'),
-              _NextDoseCard(next),
-            ],
-            if (lowStock.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Card(
-                color: AppColors.pending.withValues(alpha: 0.08),
-                child: ListTile(
-                  leading: const Icon(Icons.inventory_2_rounded, color: AppColors.pending),
-                  title: Text(lowStock.length == 1 ? 'Estoque baixo: ${lowStock.first.displayName}' : 'Estoque baixo em ${lowStock.length} medicamentos'),
-                  subtitle: const Text('Confira no controle de estoque.'),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(headline,
+                        maxLines: 2, style: const TextStyle(color: white, fontSize: 19, fontWeight: FontWeight.w800, height: 1.2)),
+                    const SizedBox(height: 4),
+                    Text(total == 0 ? 'Aproveite o dia.' : '$total dose(s) programada(s) para hoje',
+                        style: TextStyle(color: soft, fontSize: 13.5)),
+                  ]),
                 ),
-              ),
-            ],
-            if (hasPrn) ...[
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.back_hand_rounded),
-                  title: const Text('Uso eventual'),
-                  subtitle: const Text('Registrar um medicamento usado quando necessário'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrnScreen())),
-                ),
-              ),
-            ],
-            // Agenda do dia
-            const SectionTitle('Agenda de hoje'),
-            if (app.meds.isEmpty)
-              EmptyState(
-                icon: Icons.medication_rounded,
-                title: 'Vamos começar?',
-                message: 'Cadastre seu primeiro medicamento e configure os horários dos lembretes.',
-                action: FilledButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MedicationFormScreen())),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Cadastrar medicamento'),
-                ),
-              )
-            else if (doses.isEmpty)
-              const EmptyState(
-                icon: Icons.event_available_rounded,
-                title: 'Dia livre',
-                message: 'Não há doses programadas para hoje. Veja os próximos dias na Agenda.',
-              )
-            else
-              for (final d in doses) Padding(padding: const EdgeInsets.only(bottom: 10), child: DoseTile(d)),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Row(children: [
+                _Pill(icon: Icons.check_circle_rounded, value: taken, label: 'Tomadas', color: const Color(0xFF7FE6A8)),
+                const SizedBox(width: 8),
+                _Pill(icon: Icons.schedule_rounded, value: remaining, label: 'Restantes', color: const Color(0xFF9FD3FF)),
+                const SizedBox(width: 8),
+                _Pill(icon: Icons.error_outline_rounded, value: late, label: 'Atrasadas', color: const Color(0xFFFFC266)),
+              ]),
+            ),
           ]),
         ),
       ),
     );
   }
+}
+
+class _Pill extends StatelessWidget {
+  final IconData icon;
+  final int value;
+  final String label;
+  final Color color;
+  const _Pill({required this.icon, required this.value, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Semantics(
+          label: '$value $label',
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('$value', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, height: 1.1)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
+                  ),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
+}
+
+class _Alert extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  final String title;
+  final String text;
+  final VoidCallback onTap;
+  const _Alert({required this.color, required this.icon, required this.title, required this.text, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14)),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  Text(text, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+                ]),
+              ),
+              const Icon(Icons.chevron_right_rounded),
+            ]),
+          ),
+        ),
+      );
 }
 
 class _NextDoseCard extends StatelessWidget {
@@ -185,67 +309,73 @@ class _NextDoseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final now = DateTime.now();
-    final target = d.status == DoseStatus.snoozed && d.record?.snoozedUntil != null ? parseDtKey(d.record!.snoozedUntil!) : d.scheduledAt;
+    final snoozed = d.status == DoseStatus.snoozed && d.record?.snoozedUntil != null;
+    final target = snoozed ? parseDtKey(d.record!.snoozedUntil!) : d.scheduledAt;
     final diff = target.difference(now);
     final late = d.status == DoseStatus.late;
-    final bg = late ? AppColors.pending : AppColors.primary;
+    final accent = late ? AppColors.pending : Color(d.med.color);
+    final when = late ? 'Atrasado ${fmtDuration(diff)}' : (snoozed ? 'Adiado • ${fmtDuration(diff)}' : fmtDuration(diff));
     return Card(
-      color: bg,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14)),
-              child: Icon(iconForForm(d.med.form), color: Colors.white, size: 28),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(width: 6, color: accent),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(d.med.displayName,
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                Text('${d.med.form} • ${d.med.doseDescription}', style: TextStyle(color: Colors.white.withValues(alpha: 0.9))),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  MedAvatar(d.med, size: 52),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(d.med.displayName, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text('${d.med.form} • ${d.med.doseDescription}', style: TextStyle(color: cs.onSurfaceVariant)),
+                    ]),
+                  ),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(fmtTime(d.scheduledAt), style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: accent)),
+                    Text(when, style: TextStyle(fontSize: 12, color: late ? AppColors.pending : cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                  ]),
+                ]),
+                if ((d.med.instructions ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12)),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Icon(Icons.info_outline_rounded, size: 18, color: cs.primary),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(d.med.instructions!.trim(), style: const TextStyle(fontSize: 13.5))),
+                    ]),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(backgroundColor: AppColors.success),
+                      onPressed: () => quickTake(context, d),
+                      icon: const Icon(Icons.check_rounded),
+                      label: const FittedBox(child: Text('Registrar como tomado')),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    tooltip: 'Mais opções (adiar, outro horário, não tomei)',
+                    iconSize: 26,
+                    style: IconButton.styleFrom(minimumSize: const Size(52, 52)),
+                    onPressed: () => showDoseSheet(context, d),
+                    icon: const Icon(Icons.more_horiz_rounded),
+                  ),
+                ]),
               ]),
             ),
-          ]),
-          const SizedBox(height: 16),
-          Row(children: [
-            const Icon(Icons.schedule_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 6),
-            Text(fmtTime(d.scheduledAt), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                late ? 'Atrasado • ${fmtDuration(diff)}' : (d.status == DoseStatus.snoozed ? 'Adiado • ${fmtDuration(diff)}' : fmtDuration(diff)),
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
-              ),
-            ),
-          ]),
-          if ((d.med.instructions ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(d.med.instructions!.trim(), style: TextStyle(color: Colors.white.withValues(alpha: 0.9))),
-          ],
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: bg),
-                onPressed: () => quickTake(context, d),
-                icon: const Icon(Icons.check_rounded),
-                label: const Text('Registrar como tomado'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: 'Mais opções',
-              style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.18), foregroundColor: Colors.white),
-              onPressed: () => showDoseSheet(context, d),
-              icon: const Icon(Icons.more_horiz_rounded),
-            ),
-          ]),
+          ),
         ]),
       ),
     );

@@ -148,7 +148,7 @@ class _MainShellState extends State<MainShell> {
           ? FloatingActionButton.extended(
               onPressed: _add,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Medicamento'),
+              label: const Text('Novo remédio'),
               tooltip: 'Adicionar medicamento',
             )
           : null,
@@ -157,7 +157,7 @@ class _MainShellState extends State<MainShell> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Início'),
-          NavigationDestination(icon: Icon(Icons.medication_outlined), selectedIcon: Icon(Icons.medication_rounded), label: 'Medicamentos'),
+          NavigationDestination(icon: Icon(Icons.medication_outlined), selectedIcon: Icon(Icons.medication_rounded), label: 'Remédios'),
           NavigationDestination(icon: Icon(Icons.calendar_today_outlined), selectedIcon: Icon(Icons.calendar_today_rounded), label: 'Agenda'),
           NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights_rounded), label: 'Histórico'),
           NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Perfil'),

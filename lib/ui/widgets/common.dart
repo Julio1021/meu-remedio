@@ -116,8 +116,14 @@ class StatCard extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Icon(icon, color: color, size: 22),
             const SizedBox(height: 10),
-            Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+            ),
+            Text(label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13, height: 1.2)),
           ]),
         ),
       );
@@ -180,17 +186,20 @@ class DoseTile extends StatelessWidget {
     final canAct = d.status != DoseStatus.taken && d.status != DoseStatus.cancelled && d.status != DoseStatus.skipped;
     final name = d.record?.medName ?? d.med.displayName;
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
         onTap: () => showDoseSheet(context, d),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+        child: IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(width: 5, color: AppColors.forStatus(d.status)),
+            Expanded(child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 12, 8, 12),
           child: Row(children: [
             SizedBox(
-              width: 56,
+              width: 58,
               child: Column(children: [
-                Text(fmtTime(d.scheduledAt),
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: done ? cs.onSurfaceVariant : cs.onSurface)),
+                FittedBox(fit: BoxFit.scaleDown, child: Text(fmtTime(d.scheduledAt),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: done ? cs.onSurfaceVariant : cs.onSurface))),
                 if (showDate) Text(fmtDate(d.scheduledAt).substring(0, 5), style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
               ]),
             ),
@@ -239,6 +248,8 @@ class DoseTile extends StatelessWidget {
               )
             else
               const SizedBox(width: 8),
+          ]),
+            )),
           ]),
         ),
       ),
@@ -336,11 +347,12 @@ class LabeledValue extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(
-            width: 130,
+          Expanded(
+            flex: 2,
             child: Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
+          const SizedBox(width: 8),
+          Expanded(flex: 3, child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
         ]),
       );
 }

@@ -30,9 +30,14 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   Future<void> _load() async {
     final app = context.read<AppState>();
-    app.permissions = await app.notifications.permissionState();
-    final p = await app.notifications.pending();
-    if (mounted) setState(() => _pending = p);
+    try {
+      app.permissions = await app.notifications.permissionState();
+      final p = await app.notifications.pending();
+      if (mounted) setState(() => _pending = p);
+    } catch (e) {
+      app.notifications.lastError = 'Não foi possível consultar as notificações: $e';
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -72,16 +77,39 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
               },
             ),
           ),
+          if (app.notifications.lastError != null) ...[
+            const SizedBox(height: 10),
+            Card(
+              color: AppColors.pending.withValues(alpha: 0.12),
+              child: ListTile(
+                leading: const Icon(Icons.report_problem_rounded, color: AppColors.pending),
+                title: const Text('Último problema detectado'),
+                subtitle: Text(app.notifications.lastError!),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: () async {
+              final at = await app.notifications.scheduleTest(minutes: 1);
+              await _load();
+              if (context.mounted) {
+                showSnack(context, 'Lembrete de teste agendado para ${fmtTime(at)}. Pode fechar o app e aguardar.');
+              }
+            },
+            icon: const Icon(Icons.alarm_add_rounded),
+            label: const Text('Testar lembrete em 1 minuto'),
+          ),
+          const SizedBox(height: 8),
           Row(children: [
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () async {
                   await app.notifications.showTest();
-                  if (context.mounted) showSnack(context, 'Notificação de teste enviada.');
+                  if (context.mounted) showSnack(context, 'Notificação de teste enviada agora.');
                 },
                 icon: const Icon(Icons.notification_add_rounded),
-                label: const Text('Testar'),
+                label: const Text('Testar agora'),
               ),
             ),
             const SizedBox(width: 10),
@@ -90,7 +118,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                 onPressed: () async {
                   await app.notifications.rescheduleAll();
                   await _load();
-                  if (context.mounted) showSnack(context, 'Lembretes reprogramados.');
+                  if (context.mounted) {
+                    showSnack(context, '${app.notifications.lastScheduledCount} lembrete(s) reprogramado(s).');
+                  }
                 },
                 icon: const Icon(Icons.sync_rounded),
                 label: const Text('Reprogramar'),

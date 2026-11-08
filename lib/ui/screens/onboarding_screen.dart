@@ -76,6 +76,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   Future<void> _finish() async {
     final app = context.read<AppState>();
+    // Garante o pedido de permissão mesmo se o botão não foi tocado.
+    if (!(app.permissions?.notificationsEnabled ?? false)) {
+      try {
+        await app.requestPermissions();
+      } catch (_) {}
+    }
     await app.updateSettings(app.settings.copyWith(onboardingDone: true), reschedule: true);
   }
 
