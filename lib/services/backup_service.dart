@@ -22,17 +22,17 @@ class BackupService {
 
   static Future<void> shareBackup(AppDatabase db) async {
     final f = await createBackupFile(db);
-    await Share.shareXFiles([XFile(f.path, mimeType: 'application/json')],
-        text: 'Backup do Meu Remédio. Guarde em local seguro: contém dados de saúde.');
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile(f.path, mimeType: 'application/json')],
+      text: 'Backup do Meu Remédio. Guarde em local seguro: contém dados de saúde.',
+    ));
   }
 
   /// Retorna false se o usuário cancelou a seleção.
   static Future<bool> pickAndRestore(AppDatabase db) async {
-    final res = await FilePicker.platform.pickFiles(type: FileType.any, withData: true);
-    if (res == null || res.files.isEmpty) return false;
-    final file = res.files.single;
-    final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
-    if (bytes == null) throw const FormatException('Não foi possível ler o arquivo.');
+    final file = await FilePicker.pickFile(type: FileType.any);
+    if (file == null) return false;
+    final bytes = await file.readAsBytes();
     final data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
     await db.importAll(data);
     return true;

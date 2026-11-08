@@ -24,7 +24,7 @@ class ReportService {
   static String _fileStamp(DateTime d) => dateKey(d).replaceAll('-', '');
 
   static Future<void> share(File f, String text) async {
-    await Share.shareXFiles([XFile(f.path)], text: text);
+    await SharePlus.instance.share(ShareParams(files: [XFile(f.path)], text: text));
   }
 
   // -------------------------------------------------------------------- CSV
